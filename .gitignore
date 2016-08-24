@@ -2,6 +2,9 @@
 Thumbs.db
 ehthumbs.db
 
+# Default PHP file with passcodes present
+defs.php
+
 # Folder config file
 Desktop.ini
 

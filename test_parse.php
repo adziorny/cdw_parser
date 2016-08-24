@@ -1,12 +1,8 @@
 <?php
 
-// Parameters go here
-$infile = 'Noname.sql';
-
-$mysql_info = array('localhost', '<user>', '<pwd>', '<db>');
+include_once('defs.php');
 
 // Start running the script
-
 $data = readScript($infile, $tcount);
 
 // print_r($data[2]);
