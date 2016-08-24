@@ -2,11 +2,10 @@
 
 include_once('defs.php');
 
-// Start running the script
+// Load data element from file
 $data = readScript($infile, $tcount);
 
-// print_r($data[2]);
-
+// Upload elements to database
 uploadData ($data, $mysql_info);
 
 /**
@@ -25,12 +24,95 @@ function uploadData ($data, $mysql_info)
 
   // Upload here ...
   // For each table, insert table, select / insert variables, link
-  for ($i = 0; $i < length($data[0]); $i++)
+  for ($i = 0; $i < count($data[0]); $i++)
   {
-    
+    $d_id = getDatabaseID($mysqli,$data[0][$i]);
 
+    $query = "INSERT INTO CDWDEF.TABLES (tname, did, vcount) 
+              VALUES (\'" . $data[1][$i] . "\', " . $d_id .
+              "," . $data[3][$i] . ")";
+    $mysqli->query($query);
 
+    $t_id = $mysqli->insert_id;
+
+    // Now iterate through variables, select/insert, and link
+    for ($j = 0; $j < count($data[2][$i]); $j++)
+    {
+      $v_id = getVariableID($mysqli,$data[2][$i][$j]);
+
+      $query = "INSERT INTO CDWDEF.TV (tid, vid) VALUES (" .
+               $t_id . "," . $v_id . ")";
+      $mysqli->query($query);
+
+    } // End variable iteration
+
+  } // End table iteration
+
+  $mysqli->close();
+}
+
+/**
+ * For a given variable array of structure:
+ *   [0] -> Variable Name
+ *   [1] -> Variable Type [(Size)]
+ * Determines if this variable exists in the database,
+ * and either returns current vid or inserts and returns vid.
+ */
+function getVariableID ($mysqli, $var_array)
+{
+  $var = $var_array[0];
+  $type = $var_array[1];
+  $size = "NULL";  // Must be a string NULL for uploading to dB
+  if ( ($pos_s = strpos($type,'(')) !== FALSE &&
+       ($pos_e = strpos($type,')')) !== FALSE ) {
+    $size = "\'" . substr($type,$pos_s+1,$pos_e - $pos_s - 1) . "\'";
+    $type = substr($type,0,$pos_s);
   }
+
+  $query = "SELECT v.id FROM CDWDEF.VARS 
+            WHERE v.vname = \'" . $var . "\' AND
+                  v.vtype = \'" . $type . "\' AND
+                  v.vsize = " . $size;
+  $result = $mysqli->query($query);
+
+  if ($result->num_rows == 0) {
+    $query = "INSERT INTO CDWDEF.VARS (vname, vtype, vsize) VALUES (\'" . 
+             $var . "\', \'" . $type . "\', ". $size . ")";
+    $mysqli->query($query);
+
+    return $mysqli->insert_id;
+  }
+
+  $row = $result->fetch_row();
+
+  $result->close();
+
+  return $row[0];
+}
+
+/**
+ * Returns the database ID associated with that
+ * database name, either with a valid SELECT from
+ * the DBASES table, or with an INSERT.
+ */
+function getDatabaseID ($mysqli, $database)
+{
+  $query = "SELECT d.id FROM CDWDEF.DBASES 
+            WHERE d.dname = \'" . $database . "\'";
+  $result = $mysqli->query($query);
+
+  if ($result->num_rows == 0) {
+    $query = "INSERT INTO CDWDEF.DBASES (dname) VALUES (\'" . $database . "\')";
+    $mysqli->query($query);
+
+    return $mysqli->insert_id;
+  }
+
+  $row = $result->fetch_row();
+
+  $result->close();
+
+  return $row[0];
 }
 
 /**
