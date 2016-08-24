@@ -22,23 +22,31 @@ function uploadData ($data, $mysql_info)
     exit;
   }
 
+//  echo "Connected to MySQL Database!" . PHP_EOL;
+
   // Upload here ...
   // For each table, insert table, select / insert variables, link
   for ($i = 0; $i < count($data[0]); $i++)
   {
     $d_id = getDatabaseID($mysqli,$data[0][$i]);
 
+//    echo "Database " . $data[0][$i] . " id: " . $d_id . PHP_EOL;
+
     $query = "INSERT INTO CDWDEF.TABLES (tname, did, vcount) 
-              VALUES (\'" . $data[1][$i] . "\', " . $d_id .
+              VALUES ('" . $data[1][$i] . "', " . $d_id .
               "," . $data[3][$i] . ")";
     $mysqli->query($query);
 
     $t_id = $mysqli->insert_id;
 
+    echo "Table " . $data[1][$i] . " id: " . $t_id . " (vars: " . $data[3][$i] . ")" . PHP_EOL;
+
     // Now iterate through variables, select/insert, and link
     for ($j = 0; $j < count($data[2][$i]); $j++)
     {
       $v_id = getVariableID($mysqli,$data[2][$i][$j]);
+
+      echo "  Var " . $data[2][$i][$j][0] . " id: " . $v_id . PHP_EOL;
 
       $query = "INSERT INTO CDWDEF.TV (tid, vid) VALUES (" .
                $t_id . "," . $v_id . ")";
@@ -65,19 +73,21 @@ function getVariableID ($mysqli, $var_array)
   $size = "NULL";  // Must be a string NULL for uploading to dB
   if ( ($pos_s = strpos($type,'(')) !== FALSE &&
        ($pos_e = strpos($type,')')) !== FALSE ) {
-    $size = "\'" . substr($type,$pos_s+1,$pos_e - $pos_s - 1) . "\'";
+    $size = "'" . substr($type,$pos_s+1,$pos_e - $pos_s - 1) . "'";
     $type = substr($type,0,$pos_s);
   }
 
-  $query = "SELECT v.id FROM CDWDEF.VARS 
-            WHERE v.vname = \'" . $var . "\' AND
-                  v.vtype = \'" . $type . "\' AND
-                  v.vsize = " . $size;
-  $result = $mysqli->query($query);
+  $query = "SELECT v.id FROM CDWDEF.VARS v
+            WHERE v.vname = '" . $var . "' AND
+                  v.vtype = '" . $type . "'";
+  if (($result = $mysqli->query($query)) === FALSE) {
+    echo "Error: query failed [" . $query . "]" . PHP_EOL;
+    return -1;
+  }
 
   if ($result->num_rows == 0) {
-    $query = "INSERT INTO CDWDEF.VARS (vname, vtype, vsize) VALUES (\'" . 
-             $var . "\', \'" . $type . "\', ". $size . ")";
+    $query = "INSERT INTO CDWDEF.VARS (vname, vtype, vsize) VALUES ('" . 
+             $var . "', '" . $type . "', ". $size . ")";
     $mysqli->query($query);
 
     return $mysqli->insert_id;
@@ -97,12 +107,15 @@ function getVariableID ($mysqli, $var_array)
  */
 function getDatabaseID ($mysqli, $database)
 {
-  $query = "SELECT d.id FROM CDWDEF.DBASES 
-            WHERE d.dname = \'" . $database . "\'";
-  $result = $mysqli->query($query);
+  $query = "SELECT d.id FROM CDWDEF.DBASES d
+            WHERE d.dname = '" . $database . "'";
+  if (($result = $mysqli->query($query)) === FALSE) {
+    echo "Error: query failed [" . $query . "]" . PHP_EOL;
+    return -1;
+  }
 
   if ($result->num_rows == 0) {
-    $query = "INSERT INTO CDWDEF.DBASES (dname) VALUES (\'" . $database . "\')";
+    $query = "INSERT INTO CDWDEF.DBASES (dname) VALUES ('" . $database . "')";
     $mysqli->query($query);
 
     return $mysqli->insert_id;
@@ -206,19 +219,21 @@ function getVariables ($fp, $table, &$varcount)
     $pos = strpos($varline,' ');
     $var = substr($varline,0,$pos);
 
-    // Get the type; remove 'NOT NULL' and trailing ','
+    // Get the type; remove 'NOT NULL' 
     $typeline = trim(substr($varline,$pos+1));
     $pos = strpos($typeline,'NOT NULL');
     if ($pos !== FALSE)
       $typeline = trim(substr($typeline,0,$pos-1));
 
+    // Remove trailing ','
     $pos = strrpos($typeline,',');
-    if ($pos === FALSE)
+    if ($pos === FALSE) {
       $type = $typeline;
-    elseif ($pos = strlen($typeline) - 1)
+    } elseif ($pos == strlen($typeline) - 1) {
       $type = substr($typeline,0,$pos);
-    else
+    } else {
       $type = $typeline;
+    }
 
     $varcount++;
     $vars[] = array($var, $type);
